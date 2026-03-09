@@ -4,11 +4,11 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
-import Product from './models/Product.js';
-import Order from './models/Order.js';
-import cloudinary from './cloudinary.js';
-import authRoutes from './routes/auth.js';
-import paymentRoutes from './routes/payment.js';
+import Product from './server/models/Product.js';
+import Order from './server/models/Order.js';
+import cloudinary from './server/cloudinary.js';
+import authRoutes from './server/routes/auth.js';
+import paymentRoutes from './server/routes/payment.js';
 
 dotenv.config();
 
