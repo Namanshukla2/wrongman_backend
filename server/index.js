@@ -239,11 +239,18 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ───────── START SERVER ─────────
+let isConnected = false;
+
 async function startServer() {
   try {
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`
+    if (!isConnected) {
+      await connectDB();
+      isConnected = true;
+    }
+
+    if (!process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log(`
 ☠️  Wrong Man API running on http://localhost:${PORT}
    - Auth:     http://localhost:${PORT}/api/auth
    - Products: http://localhost:${PORT}/api/products
@@ -251,10 +258,13 @@ async function startServer() {
    - Upload:   http://localhost:${PORT}/api/upload
    - Health:   http://localhost:${PORT}/api/health
 `);
-    });
+      });
+    }
   } catch (err) {
     console.error('❌ Failed to start server:', err);
   }
 }
 
-startServer();
+await startServer();
+
+export default app;
