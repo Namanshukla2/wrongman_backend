@@ -27,10 +27,12 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-// CORS with credentials so cookies work from Next app
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000',
+      'https://wrongman-cloting-web.vercel.app', // Add your frontend URL
+    ],
     credentials: true,
   })
 );
