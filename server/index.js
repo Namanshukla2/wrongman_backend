@@ -31,7 +31,9 @@ app.use(
   cors({
     origin: [
       'http://localhost:3000',
-      'https://wrongman-cloting-web.vercel.app', // Add your frontend URL
+      'https://wrongman-cloting-web.vercel.app',
+      'https://www.wrongman.in',      // ← add this
+      'https://wrongman.in',          // ← add this too
     ],
     credentials: true,
   })
