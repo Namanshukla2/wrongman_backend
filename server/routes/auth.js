@@ -11,12 +11,14 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const COOKIE_NAME = 'token';
 const FRONTEND_URL = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ✅ Changed
+  secure: IS_PROD,           // true in production (HTTPS), false in dev
+  sameSite: IS_PROD ? 'none' : 'lax', // 'none' for cross-origin in prod, 'lax' for dev
   path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
 // Helper: Generate JWT and set cookie
@@ -27,11 +29,7 @@ function setAuthCookie(res, user) {
     { expiresIn: '7d' }
   );
 
-  res.cookie(COOKIE_NAME, token, {
-    ...COOKIE_OPTIONS,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
   return token;
 }
 
@@ -159,17 +157,15 @@ router.post('/forgot-password', async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
 
-    // Always return success to prevent email enumeration
     if (!user) {
       return res.json({ message: 'If an account exists, a reset link has been sent' });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     user.resetToken = resetTokenHash;
-    user.resetTokenExpiry = Date.now() + 3600000; // 1 hour
+    user.resetTokenExpiry = Date.now() + 3600000;
     await user.save();
 
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
@@ -178,7 +174,6 @@ router.post('/forgot-password', async (req, res) => {
       await sendPasswordResetEmail(email, resetUrl);
     } catch (emailErr) {
       console.error('Email send error:', emailErr);
-      // Don't fail the request if email fails
     }
 
     res.json({ message: 'If an account exists, a reset link has been sent' });
@@ -225,7 +220,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// PHONE OTP AUTH (Email-based for demo, replace with SMS service)
+// PHONE OTP AUTH
 // ═══════════════════════════════════════════════════════════
 
 // POST /api/auth/send-otp
@@ -237,11 +232,9 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ message: 'Phone number required' });
     }
 
-    // Generate OTP
     const otp = generateOtp();
-    const otpExpiry = Date.now() + 600000; // 10 minutes
+    const otpExpiry = Date.now() + 600000;
 
-    // Find or create user by phone
     let user = await User.findOne({ phone });
 
     if (!user) {
@@ -256,10 +249,8 @@ router.post('/send-otp', async (req, res) => {
       await user.save();
     }
 
-    // For demo: log OTP (in production, use SMS service like Twilio)
     console.log(`📱 OTP for ${phone}: ${otp}`);
 
-    // If user has email, send OTP via email (for testing without SMS)
     if (user.email) {
       try {
         await sendOtpEmail(user.email, otp);
@@ -294,7 +285,6 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Clear OTP and mark as verified
     user.phoneOtp = undefined;
     user.phoneOtpExpiry = undefined;
     user.phoneVerified = true;
@@ -321,7 +311,6 @@ router.post('/google', async (req, res) => {
       return res.status(400).json({ message: 'Google credential required' });
     }
 
-    // Verify Google token
     const response = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`
     );
@@ -333,13 +322,11 @@ router.post('/google', async (req, res) => {
 
     const { sub: googleId, email, name, picture } = payload;
 
-    // Find by googleId or email
     let user = await User.findOne({
       $or: [{ googleId }, { email: email?.toLowerCase() }],
     });
 
     if (user) {
-      // Link Google if not already
       if (!user.googleId) {
         user.googleId = googleId;
         user.avatar = user.avatar || picture;
@@ -347,7 +334,6 @@ router.post('/google', async (req, res) => {
         await user.save();
       }
     } else {
-      // Create new user
       user = await User.create({
         googleId,
         email: email?.toLowerCase(),
@@ -378,7 +364,6 @@ router.post('/create-admin', async (req, res) => {
 
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
-      // Update to admin if exists
       existing.role = 'admin';
       await existing.save();
       setAuthCookie(res, existing);
